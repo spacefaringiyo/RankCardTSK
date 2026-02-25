@@ -7,11 +7,11 @@ const BaseCard = ({
     showDate = true,
     customDate = '',
     dateString,
-    themeColors = {},
+    config, // NEW: The unified configuration recipe
     layoutOverrides = {},
-    renderBackground = () => null,
-    renderMotif = () => null,
-    renderOverlay = () => null,
+    isShiny = false, // Flowed down for holo
+    lightX = 0.5,
+    lightY = 0.5,
     svgRef,
 }) => {
     // Scoped ID to prevent clipPath collisions in multi-card views (Studio)
@@ -49,7 +49,10 @@ const BaseCard = ({
         }
     }
 
-    const colors = { ...defaultColors, ...themeColors };
+    // Safely extract from config
+    const colors = { ...defaultColors, ...(config?.themeColors || {}) };
+    const layers = config?.layers || {};
+    const fx = config?.fx || {};
 
     // Set fallback date if not provided
     const userDate = customDate || dateString;
@@ -91,17 +94,20 @@ const BaseCard = ({
                     <g transform={`translate(${layout.paddingOffset.x}, ${layout.paddingOffset.y})`}>
 
                         {/* 1. LAYER: Core Background (Gradients, Solid Fills) */}
-                        {renderBackground(layout.card)}
+                        {layers.background && layers.background(layout.card, uid, colors)}
 
                         {/* 2. LAYER: Base Texture Overlays (Noise, Patterns) */}
-                        {renderOverlay(layout.card)}
+                        {layers.texture && layers.texture(layout.card, uid, colors, fx)}
 
-                        {/* 3. LAYER: Specific Motif (Butterflies, Lines, Particles) */}
+                        {/* 3. LAYER: Holographic Effects (Only renders if isShiny=true) */}
+                        {isShiny && layers.holo && layers.holo(layout.card, uid, lightX, lightY, fx)}
+
+                        {/* 4. LAYER: Specific Motif (Butterflies, Lines, Particles) */}
                         <g clipPath={`url(#${clipId})`}>
-                            {renderMotif(layout.innerBorder)}
+                            {layers.motif && layers.motif(layout.card, uid, colors)}
                         </g>
 
-                        {/* 4. LAYER: Standard Borders */}
+                        {/* 5. LAYER: Standard Borders */}
                         {/* Outer Thicker border */}
                         <rect
                             x={layout.outerBorder.x} y={layout.outerBorder.y}
@@ -120,7 +126,7 @@ const BaseCard = ({
                             rx={layout.innerBorder.rx} ry={layout.innerBorder.ry}
                         />
 
-                        {/* 5. LAYER: Standard Text Elements */}
+                        {/* 6. LAYER: Standard Text Elements */}
                         <text
                             x={layout.textTitle.x} y={layout.textTitle.y}
                             fontFamily="'Times New Roman', serif"
@@ -128,7 +134,9 @@ const BaseCard = ({
                             fontWeight="normal" fill={colors.primaryText}
                             textAnchor="middle" letterSpacing={layout.textTitle.letterSpacing}
                         >
-                            BLESSED
+                            {config?.displayName
+                                ? config.displayName.toUpperCase().replace(' PALETTE', '')
+                                : 'RANK'}
                         </text>
 
                         <text

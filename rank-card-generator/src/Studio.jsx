@@ -1,43 +1,66 @@
 import React, { useState, useEffect } from 'react';
 import './Studio.css';
+import BaseCard from './components/BaseCard';
+import InteractiveCardWrapper from './components/InteractiveCardWrapper';
 
-// Auto-discover all rank components (finals + drafts) via Vite's import.meta.glob
-const finalModules = import.meta.glob('./ranks/*.jsx', { eager: true });
-const draftModules = import.meta.glob('./ranks/drafts/*.jsx', { eager: true });
+// 1. Auto-discover all layers via Vite's import.meta.glob
+const palettesModules = import.meta.glob('./layers/palettes/*.js', { eager: true });
+const backgroundsModules = import.meta.glob('./layers/backgrounds/*.jsx', { eager: true });
+const motifsModules = import.meta.glob('./layers/motifs/*.jsx', { eager: true });
+const texturesModules = import.meta.glob('./layers/textures/*.jsx', { eager: true });
+const holoModules = import.meta.glob('./layers/holo/*.jsx', { eager: true });
 
-// Convert filename to display name: "BlessedDraftF" → "Blessed Draft F"
-function toDisplayName(filename, prefix) {
-    const name = filename.replace(/\.jsx$/, '');
+// Convert filename to display name
+function toDisplayName(path) {
+    const filename = path.split('/').pop().replace(/\.(jsx|js)$/, '');
     // Insert a space before each uppercase letter (except the very first)
-    const spaced = name.replace(/([a-z])([A-Z])/g, '$1 $2');
-    return `${spaced}${prefix ? ` ${prefix}` : ''}`;
+    return filename.replace(/([a-z])([A-Z])/g, '$1 $2');
 }
 
-// Build registry: { displayName: Component }
-function buildRegistry() {
+// Build generic registry: { "Display Name": ExportedFunctionOrObject }
+function buildRegistry(modules) {
     const registry = {};
+    for (const [path, mod] of Object.entries(modules)) {
+        const displayName = toDisplayName(path);
 
-    // Finals (from ranks/*.jsx)
-    for (const [path, mod] of Object.entries(finalModules)) {
-        const filename = path.split('/').pop();
-        const displayName = toDisplayName(filename, '(Final)');
-        if (mod.default) registry[displayName] = mod.default;
+        // Find the main export. Usually it's either `default`, or a named export.
+        // For Palettes it's likely an object `BlessedPalette`. For renderers it's `renderRadialGlow`.
+        if (mod.default) {
+            registry[displayName] = mod.default;
+        } else {
+            // Just grab the first exported value
+            const firstExport = Object.values(mod)[0];
+            if (firstExport) registry[displayName] = firstExport;
+        }
     }
-
-    // Drafts (from ranks/drafts/*.jsx)
-    for (const [path, mod] of Object.entries(draftModules)) {
-        const filename = path.split('/').pop();
-        const displayName = toDisplayName(filename, '');
-        if (mod.default) registry[displayName] = mod.default;
-    }
-
+    // Always provide a "None" option if applicable (except maybe Palette)
     return registry;
 }
 
-const DRAFT_REGISTRY = buildRegistry();
+const REGISTRIES = {
+    palettes: buildRegistry(palettesModules),
+    backgrounds: buildRegistry(backgroundsModules),
+    motifs: buildRegistry(motifsModules),
+    textures: buildRegistry(texturesModules),
+    holo: buildRegistry(holoModules)
+};
 
-const REGISTRY_KEYS = Object.keys(DRAFT_REGISTRY);
-const DEFAULT_DRAFT_KEY = REGISTRY_KEYS[0] || '';
+// Insert a "None" option into render registries (not palettes)
+const safeRegistries = {
+    palettes: REGISTRIES.palettes,
+    backgrounds: { "None": null, ...REGISTRIES.backgrounds },
+    motifs: { "None": null, ...REGISTRIES.motifs },
+    textures: { "None": null, ...REGISTRIES.textures },
+    holo: { "None": null, ...REGISTRIES.holo },
+}
+
+const DEFAULT_SELECTIONS = {
+    palette: Object.keys(safeRegistries.palettes)[0] || '',
+    background: Object.keys(safeRegistries.backgrounds)[0] || 'None',
+    motif: Object.keys(safeRegistries.motifs)[0] || 'None',
+    texture: Object.keys(safeRegistries.textures)[0] || 'None',
+    holo: Object.keys(safeRegistries.holo)[0] || 'None',
+};
 
 export default function Studio({ onExit }) {
     // Shared State mapped to localStorage
@@ -45,10 +68,10 @@ export default function Studio({ onExit }) {
     const [memberNumber, setMemberNumber] = useState(() => localStorage.getItem('studio_memberNumber') || '1234');
     const [dateString, setDateString] = useState(() => localStorage.getItem('studio_dateString') || '');
 
-    // Slots array where each slot selects a specific draft
+    // Slots array where each slot selects 5 properties
     const [slots, setSlots] = useState(() => {
-        const saved = localStorage.getItem('studio_slots');
-        return saved ? JSON.parse(saved) : [{ id: 1, draftKey: DEFAULT_DRAFT_KEY }];
+        const saved = localStorage.getItem('studio_sandbox_slots');
+        return saved ? JSON.parse(saved) : [{ id: 1, selections: { ...DEFAULT_SELECTIONS } }];
     });
 
     // Save to localStorage whenever these change
@@ -56,25 +79,54 @@ export default function Studio({ onExit }) {
         localStorage.setItem('studio_playerName', playerName);
         localStorage.setItem('studio_memberNumber', memberNumber);
         localStorage.setItem('studio_dateString', dateString);
-        localStorage.setItem('studio_slots', JSON.stringify(slots));
+        localStorage.setItem('studio_sandbox_slots', JSON.stringify(slots));
     }, [playerName, memberNumber, dateString, slots]);
 
     const addSlot = () => {
-        setSlots([...slots, { id: Date.now(), draftKey: DEFAULT_DRAFT_KEY }]);
+        setSlots([...slots, { id: Date.now(), selections: { ...DEFAULT_SELECTIONS } }]);
     };
 
     const removeSlot = (idToRemove) => {
         setSlots(slots.filter(s => s.id !== idToRemove));
     };
 
-    const updateSlotDraft = (id, newDraftKey) => {
-        setSlots(slots.map(s => s.id === id ? { ...s, draftKey: newDraftKey } : s));
+    const updateSlotSelection = (id, category, value) => {
+        setSlots(slots.map(s => s.id === id ? {
+            ...s,
+            selections: { ...s.selections, [category]: value }
+        } : s));
+    };
+
+    const handleCopyConfig = (slot) => {
+        const sel = slot.selections;
+
+        // This generates a stringified representation of the JS code needed for rankConfigs.js
+        const codeString = `export const DraftConfig = {
+    id: 'draft-${Date.now()}',
+    displayName: '${sel.palette} Draft',
+    themeColors: ${sel.palette ? `${sel.palette.replace(' ', '')}Palette` : '{}'},
+    layers: {
+        background: render${sel.background.replace(' ', '')},
+        motif: render${sel.motif.replace(' ', '')},
+        texture: render${sel.texture.replace(' ', '')},
+        holo: render${sel.holo.replace(' ', '')}
+    },
+    fx: {
+        holoBlendMode: 'screen',
+        textureBlendMode: 'overlay',
+        textureOpacity: 0.5,
+    }
+};`;
+
+        navigator.clipboard.writeText(codeString)
+            .then(() => alert("Config copied to clipboard! Paste it into src/configs/rankConfigs.js"))
+            .catch(() => alert("Failed to copy."));
     };
 
     return (
         <div className="studio-container">
             <aside className="studio-sidebar">
-                <h2>Motif Draft Studio</h2>
+                <h2>Motif Sandbox</h2>
                 <div className="studio-controls">
                     <div className="control-group">
                         <label>Mock Player Name</label>
@@ -112,38 +164,91 @@ export default function Studio({ onExit }) {
 
             <main className="studio-main">
                 <header className="studio-header">
-                    <h3>Draft Viewer</h3>
+                    <h3>Mix-and-Match Viewer</h3>
                     <button className="primary-button" onClick={addSlot}>
-                        + Add Comparison Slot
+                        + Add Sandbox Slot
                     </button>
                 </header>
 
                 <div className="studio-grid">
                     {slots.map(slot => {
-                        const ComponentToRender = DRAFT_REGISTRY[slot.draftKey] || Object.values(DRAFT_REGISTRY)[0];
+                        const sel = slot.selections;
+
+                        // Construct the ephemeral sandbox config
+                        const sandboxConfig = {
+                            displayName: sel.palette || 'Rank',
+                            themeColors: safeRegistries.palettes[sel.palette] || {},
+                            layers: {
+                                background: safeRegistries.backgrounds[sel.background],
+                                motif: safeRegistries.motifs[sel.motif],
+                                texture: safeRegistries.textures[sel.texture],
+                                holo: safeRegistries.holo[sel.holo]
+                            },
+                            fx: {
+                                holoBlendMode: 'screen',
+                                textureBlendMode: 'overlay',
+                                textureOpacity: 0.5,
+                            }
+                        };
 
                         return (
                             <div key={slot.id} className="slot-container">
-                                <div className="slot-header">
-                                    <select
-                                        className="slot-select"
-                                        value={slot.draftKey}
-                                        onChange={(e) => updateSlotDraft(slot.id, e.target.value)}
-                                    >
-                                        {Object.keys(DRAFT_REGISTRY).map(key => (
-                                            <option key={key} value={key}>{key}</option>
-                                        ))}
-                                    </select>
-                                    <button className="danger-button" onClick={() => removeSlot(slot.id)}>Remove</button>
+                                <div className="slot-header sandbox-header">
+                                    <div className="sandbox-controls">
+                                        <div className="sandbox-dropdown">
+                                            <span className="dropdown-label">Palette</span>
+                                            <select value={sel.palette} onChange={(e) => updateSlotSelection(slot.id, 'palette', e.target.value)}>
+                                                {Object.keys(safeRegistries.palettes).map(k => <option key={k} value={k}>{k}</option>)}
+                                            </select>
+                                        </div>
+                                        <div className="sandbox-dropdown">
+                                            <span className="dropdown-label">Background</span>
+                                            <select value={sel.background} onChange={(e) => updateSlotSelection(slot.id, 'background', e.target.value)}>
+                                                {Object.keys(safeRegistries.backgrounds).map(k => <option key={k} value={k}>{k}</option>)}
+                                            </select>
+                                        </div>
+                                        <div className="sandbox-dropdown">
+                                            <span className="dropdown-label">Motif</span>
+                                            <select value={sel.motif} onChange={(e) => updateSlotSelection(slot.id, 'motif', e.target.value)}>
+                                                {Object.keys(safeRegistries.motifs).map(k => <option key={k} value={k}>{k}</option>)}
+                                            </select>
+                                        </div>
+                                        <div className="sandbox-dropdown">
+                                            <span className="dropdown-label">Texture</span>
+                                            <select value={sel.texture} onChange={(e) => updateSlotSelection(slot.id, 'texture', e.target.value)}>
+                                                {Object.keys(safeRegistries.textures).map(k => <option key={k} value={k}>{k}</option>)}
+                                            </select>
+                                        </div>
+                                        <div className="sandbox-dropdown">
+                                            <span className="dropdown-label">Holographic</span>
+                                            <select value={sel.holo} onChange={(e) => updateSlotSelection(slot.id, 'holo', e.target.value)}>
+                                                {Object.keys(safeRegistries.holo).map(k => <option key={k} value={k}>{k}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <button className="danger-button remove-btn" onClick={() => removeSlot(slot.id)}>&times;</button>
                                 </div>
 
                                 <div className="card-scale-wrapper">
-                                    {/* The component will render at 1600x850 but CSS scales it down visually */}
-                                    <ComponentToRender
-                                        playerName={playerName}
-                                        memberNumber={memberNumber}
-                                        dateString={dateString}
-                                    />
+                                    <InteractiveCardWrapper>
+                                        {({ lightX, lightY }) => (
+                                            <BaseCard
+                                                config={sandboxConfig}
+                                                playerName={playerName}
+                                                memberNumber={memberNumber}
+                                                dateString={dateString}
+                                                isShiny={sel.holo !== 'None'}
+                                                lightX={lightX}
+                                                lightY={lightY}
+                                            />
+                                        )}
+                                    </InteractiveCardWrapper>
+                                </div>
+
+                                <div className="slot-footer">
+                                    <button className="secondary-button" onClick={() => handleCopyConfig(slot)} style={{ width: '100%', fontSize: '0.8rem', padding: '0.4rem' }}>
+                                        📋 Copy Config JSON
+                                    </button>
                                 </div>
                             </div>
                         )

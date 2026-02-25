@@ -1,12 +1,77 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import './App.css'
-import BlessedRank from './ranks/BlessedRank'
+import BlessedRank from './ranks/BlessedRank' // We will keep this for backwards compatibility for now, but we won't use it here.
+import BaseCard from './components/BaseCard'
 import InteractiveCardWrapper from './components/InteractiveCardWrapper'
 import Studio from './Studio'
 import { exportSvgToPng } from './utils/exportImage'
 import { exportSvgToMp4 } from './utils/exportVideo'
 
+// 1. Auto-discover all Rank Configs
+const rankConfigModules = import.meta.glob('./configs/rankConfigs.js', { eager: true });
+const RANK_CONFIGS = {};
+for (const [path, mod] of Object.entries(rankConfigModules)) {
+  // We expect rankConfigs.js to export named configs like BlessedRankConfig
+  for (const [exportName, configObj] of Object.entries(mod)) {
+    if (configObj && configObj.id) {
+      RANK_CONFIGS[configObj.id] = configObj;
+    }
+  }
+}
+
+// 2. Auto-discover all layers for the Sandbox Mode
+const palettesModules = import.meta.glob('./layers/palettes/*.js', { eager: true });
+const backgroundsModules = import.meta.glob('./layers/backgrounds/*.jsx', { eager: true });
+const motifsModules = import.meta.glob('./layers/motifs/*.jsx', { eager: true });
+const texturesModules = import.meta.glob('./layers/textures/*.jsx', { eager: true });
+const holoModules = import.meta.glob('./layers/holo/*.jsx', { eager: true });
+
+function toDisplayName(path) {
+  const filename = path.split('/').pop().replace(/\.(jsx|js)$/, '');
+  return filename.replace(/([a-z])([A-Z])/g, '$1 $2');
+}
+
+function buildRegistry(modules) {
+  const registry = {};
+  for (const [path, mod] of Object.entries(modules)) {
+    const displayName = toDisplayName(path);
+    if (mod.default) registry[displayName] = mod.default;
+    else registry[displayName] = Object.values(mod)[0];
+  }
+  return registry;
+}
+
+const safeRegistries = {
+  palettes: buildRegistry(palettesModules),
+  backgrounds: { "None": null, ...buildRegistry(backgroundsModules) },
+  motifs: { "None": null, ...buildRegistry(motifsModules) },
+  textures: { "None": null, ...buildRegistry(texturesModules) },
+  holo: { "None": null, ...buildRegistry(holoModules) },
+}
+
+const DEFAULT_SANDBOX = {
+  palette: Object.keys(safeRegistries.palettes)[0] || '',
+  background: Object.keys(safeRegistries.backgrounds)[0] || 'None',
+  motif: Object.keys(safeRegistries.motifs)[0] || 'None',
+  texture: Object.keys(safeRegistries.textures)[0] || 'None',
+  holo: Object.keys(safeRegistries.holo)[0] || 'None',
+};
+
+
 function App() {
+  const [generatorMode, setGeneratorMode] = useState(() => {
+    return localStorage.getItem('generatorMode') || 'profile'; // 'profile' or 'sandbox'
+  });
+
+  const [selectedProfileId, setSelectedProfileId] = useState(() => {
+    return localStorage.getItem('selectedProfileId') || Object.keys(RANK_CONFIGS)[0] || '';
+  });
+
+  const [sandboxSelections, setSandboxSelections] = useState(() => {
+    const saved = localStorage.getItem('sandboxSelections');
+    return saved ? JSON.parse(saved) : DEFAULT_SANDBOX;
+  });
+
   const [showStudio, setShowStudio] = useState(false);
   const [cards, setCards] = useState([]);
   const [playerName, setPlayerName] = useState(() => {
@@ -35,7 +100,10 @@ function App() {
     localStorage.setItem('customDate', customDate);
     localStorage.setItem('playerName', playerName);
     localStorage.setItem('memberNumber', memberNumber);
-  }, [showMemberNumber, showDate, customDate, playerName, memberNumber]);
+    localStorage.setItem('generatorMode', generatorMode);
+    localStorage.setItem('selectedProfileId', selectedProfileId);
+    localStorage.setItem('sandboxSelections', JSON.stringify(sandboxSelections));
+  }, [showMemberNumber, showDate, customDate, playerName, memberNumber, generatorMode, selectedProfileId, sandboxSelections]);
 
   const handleResetSettings = () => {
     setShowMemberNumber(true);
@@ -75,6 +143,30 @@ function App() {
     if (!playerName) return;
     if (showMemberNumber && !memberNumber) return;
 
+    // Build the resolved config for this specific generated card
+    let resolvedConfig = null;
+
+    if (generatorMode === 'profile') {
+      resolvedConfig = RANK_CONFIGS[selectedProfileId] || Object.values(RANK_CONFIGS)[0];
+    } else {
+      // Build ephemeral sandbox config
+      resolvedConfig = {
+        displayName: sandboxSelections.palette || 'Rank',
+        themeColors: safeRegistries.palettes[sandboxSelections.palette] || {},
+        layers: {
+          background: safeRegistries.backgrounds[sandboxSelections.background],
+          motif: safeRegistries.motifs[sandboxSelections.motif],
+          texture: safeRegistries.textures[sandboxSelections.texture],
+          holo: safeRegistries.holo[sandboxSelections.holo]
+        },
+        fx: {
+          holoBlendMode: 'screen',
+          textureBlendMode: 'overlay',
+          textureOpacity: 0.5,
+        }
+      };
+    }
+
     const newCard = {
       id: Date.now(),
       playerName,
@@ -82,6 +174,8 @@ function App() {
       showMemberNumber,
       showDate,
       customDate,
+      config: resolvedConfig,
+      isHoloEnabled: generatorMode === 'profile' ? !!resolvedConfig.layers?.holo : sandboxSelections.holo !== 'None'
     };
 
     setCards([newCard, ...cards]);
@@ -231,6 +325,78 @@ function App() {
               </div>
             </div>
 
+            {/* GENERATOR MODE SELECTOR */}
+            <div className="generator-mode-selector" style={{ marginTop: '1.5rem', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid #333', paddingBottom: '0.5rem', marginBottom: '1rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                  <input
+                    type="radio"
+                    name="genMode"
+                    checked={generatorMode === 'profile'}
+                    onChange={() => setGeneratorMode('profile')}
+                  />
+                  Use Profile
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                  <input
+                    type="radio"
+                    name="genMode"
+                    checked={generatorMode === 'sandbox'}
+                    onChange={() => setGeneratorMode('sandbox')}
+                  />
+                  Mix & Match
+                </label>
+              </div>
+
+              {generatorMode === 'profile' ? (
+                <div className="input-group">
+                  <label>Select Rank Profile</label>
+                  <select
+                    value={selectedProfileId}
+                    onChange={(e) => setSelectedProfileId(e.target.value)}
+                    style={{ padding: '0.75rem', backgroundColor: '#2c2c2c', color: 'white', border: '1px solid #444', borderRadius: '4px' }}
+                  >
+                    {Object.values(RANK_CONFIGS).map(cfg => (
+                      <option key={cfg.id} value={cfg.id}>{cfg.displayName}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div className="sandbox-controls">
+                  <div className="sandbox-dropdown">
+                    <span className="dropdown-label">Palette</span>
+                    <select value={sandboxSelections.palette} onChange={(e) => setSandboxSelections({ ...sandboxSelections, palette: e.target.value })}>
+                      {Object.keys(safeRegistries.palettes).map(k => <option key={k} value={k}>{k}</option>)}
+                    </select>
+                  </div>
+                  <div className="sandbox-dropdown">
+                    <span className="dropdown-label">Background</span>
+                    <select value={sandboxSelections.background} onChange={(e) => setSandboxSelections({ ...sandboxSelections, background: e.target.value })}>
+                      {Object.keys(safeRegistries.backgrounds).map(k => <option key={k} value={k}>{k}</option>)}
+                    </select>
+                  </div>
+                  <div className="sandbox-dropdown">
+                    <span className="dropdown-label">Motif</span>
+                    <select value={sandboxSelections.motif} onChange={(e) => setSandboxSelections({ ...sandboxSelections, motif: e.target.value })}>
+                      {Object.keys(safeRegistries.motifs).map(k => <option key={k} value={k}>{k}</option>)}
+                    </select>
+                  </div>
+                  <div className="sandbox-dropdown">
+                    <span className="dropdown-label">Texture</span>
+                    <select value={sandboxSelections.texture} onChange={(e) => setSandboxSelections({ ...sandboxSelections, texture: e.target.value })}>
+                      {Object.keys(safeRegistries.textures).map(k => <option key={k} value={k}>{k}</option>)}
+                    </select>
+                  </div>
+                  <div className="sandbox-dropdown">
+                    <span className="dropdown-label">Holographic</span>
+                    <select value={sandboxSelections.holo} onChange={(e) => setSandboxSelections({ ...sandboxSelections, holo: e.target.value })}>
+                      {Object.keys(safeRegistries.holo).map(k => <option key={k} value={k}>{k}</option>)}
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <button type="submit" className="primary-button generate-button">
               Generate Rank Card
             </button>
@@ -270,11 +436,11 @@ function App() {
                     &times;
                   </button>
 
-                  {/* Static Card (PNG) */}
                   <div className="card-panel">
                     <h3>Static Card</h3>
                     <div className="card-scale-wrapper">
-                      <BlessedRank
+                      <BaseCard
+                        config={card.config || BlessedRankConfig}
                         playerName={card.playerName}
                         memberNumber={card.memberNumber}
                         showMemberNumber={card.showMemberNumber}
@@ -293,13 +459,14 @@ function App() {
                     <h3>Holographic Card ✨</h3>
                     <InteractiveCardWrapper>
                       {({ lightX, lightY }) => (
-                        <BlessedRank
+                        <BaseCard
+                          config={card.config}
                           playerName={card.playerName}
                           memberNumber={card.memberNumber}
                           showMemberNumber={card.showMemberNumber}
                           showDate={card.showDate}
                           customDate={card.customDate}
-                          isShiny={true}
+                          isShiny={card.isHoloEnabled}
                           lightX={exportLightOverride ? exportLightOverride.x : lightX}
                           lightY={exportLightOverride ? exportLightOverride.y : lightY}
                           svgRef={(el) => { if (el) holoSvgRefs.current[card.id] = el; }}
@@ -309,9 +476,9 @@ function App() {
                     <button
                       className="export-button export-mp4"
                       onClick={() => handleExportMp4(card)}
-                      disabled={!!exportProgress}
+                      disabled={!!exportProgress || !card.isHoloEnabled}
                     >
-                      🎬 Export MP4
+                      🎬 Export MP4 {card.isHoloEnabled ? '' : '(No Holo Layer)'}
                     </button>
                   </div>
                 </div>

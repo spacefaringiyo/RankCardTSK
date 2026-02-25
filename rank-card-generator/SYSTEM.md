@@ -4,11 +4,11 @@
 
 ## What This Is
 
-A React + Vite app that generates SVG-based rank cards for community members. Cards are designed visually using a Motif Draft Studio, then generated on the main page with two views: a **static card** (PNG export) and an **interactive holographic card** (MP4 export with 3D tilt + shimmer).
+A React + Vite app that generates SVG-based rank cards for community members. Cards can be designed visually using the **Motif Sandbox Studio**, then generated on the main page with two views: a **static card** (PNG export) and an **interactive holographic card** (MP4 export with 3D tilt + shimmer engine).
 
 ## Tech Stack
 
-- React 19, Vite 7, vanilla CSS
+- React 19, Vite 7, Vanilla CSS
 - All visuals are **pure SVG** — no canvas for rendering, only for export rasterization
 - MP4 export uses `@ffmpeg/ffmpeg` (WASM, ~25MB, cached by browser)
 - Vite serves with COOP/COEP headers for `SharedArrayBuffer` (see `vite.config.js`)
@@ -18,99 +18,106 @@ A React + Vite app that generates SVG-based rank cards for community members. Ca
 ## Architecture at a Glance
 
 ```
-App.jsx                          ← Main page: form + generated cards
-├── BlessedRank (static)         ← PNG export
-├── InteractiveCardWrapper       ← Physics: tilt, spring, drag
-│   └── BlessedRank (isShiny)   ← Holographic, MP4 export
-└── Studio.jsx                   ← Motif Draft Studio (design tool)
+App.jsx                          ← Main page: Member Form + Generated Cards
+├── Mode Selector                ← Choose "Use Profile" vs "Mix & Match Sandbox"
+├── BaseCard (Static)            ← Loops through config layers, PNG export
+│   └── InteractiveCardWrapper   ← Physics engine: tilt, spring, drag
+│       └── BaseCard (Holo)      ← Loops through config layers + evaluates Holo layer, MP4 export
+└── Studio.jsx                   ← Motif Sandbox Studio (visual mix-and-match tool)
 ```
 
-### The Two-Layer Card System
+### The 6-Layer Composition Architecture
 
-Every card is composed of:
+Card visual design is completely decoupled from the React components. A "Rank" is just a pure JSON data object (`config`) that tells `<BaseCard>` which layers to pull from the `src/registry/`.
 
-1. **`BaseCard.jsx`** — The layout foundation. Manages SVG canvas (1600×850), text positions, borders, clipping. **Rarely edited.**
-2. **Rank file** (e.g. `BlessedRank.jsx`) — The visual theme. Passes `themeColors` + three render props to BaseCard:
-   - `renderBackground(cardBounds)` — base gradient/fill (canvas: 1200×800)
-   - `renderOverlay(cardBounds)` — noise textures, holographic effects
-   - `renderMotif(innerBounds)` — decorative elements (butterflies, shapes), clipped to inner border
+Every card `config` is composed of 6 layers:
 
-### Interactive System (3 modules)
-
-| Module | Role | Key Props |
-|--------|------|-----------|
-| `InteractiveCardWrapper.jsx` | DOM physics engine: mouse → tilt + spring animation | `children` render prop: `({ lightX, lightY, isHovering, isGrabbing })` |
-| `HolographicOverlay.jsx` | Pure SVG shimmer effect | `lightX`, `lightY` (0–1 each), `cardBounds`, `type` |
-| `useSpring.js` | Damped spring physics hook | `target`, `{ stiffness, damping, mass }` |
-
-### Export Pipeline
-
-| Format | Flow | File |
-|--------|------|------|
-| PNG | SVG → `XMLSerializer` → base64 → Image → Canvas → `toDataURL` → download | `utils/exportImage.js` |
-| MP4 | Sweep lightX/Y over 120 frames → SVG→Canvas per frame → ffmpeg.wasm H.264 encode → download | `utils/exportVideo.js` |
+1. **`themeColors`** (Palette) — The color constants (e.g., `#000000` canvas, `#d07070` accents).
+2. **`background`** — The base SVG gradient, shape, or fill (e.g., `RadialGlow`).
+3. **`texture`** — SVG Noise or grain filters applied via `mixBlendMode` (e.g., `FineNoise`).
+4. **`motif`** — Vector decorations (e.g., `Butterflies`, geometric shapes). These are *always* clipped to the inner border bounds.
+5. **`holo`** — Dynamic shimmer shaders linked to mouse physics via `lightX`/`lightY` (e.g., `RainbowFoil`). Only renders when `BaseCard` receives `isShiny={true}`.
+6. **`BaseCard`** (Layout) — The foundational framework. Handles the actual scaling (1600x850), border strokes, typography, clipping masks, and mapping the config pieces into the final SVG.
 
 ---
 
-## File Map
+## File System & The Registry
 
-```
+```text
 src/
-├── App.jsx                  # Main page (form + dual card view)
-├── App.css                  # Layout, export progress bar
-├── Studio.jsx               # Motif Draft Studio (auto-discovers drafts)
-├── Studio.css
+├── App.jsx                  # Main page (form, export pipelines, mode selector)
+├── Studio.jsx               # Motif Sandbox Studio (dynamic visual previewer)
 ├── components/
-│   ├── BaseCard.jsx          # SVG layout foundation (DO NOT EDIT lightly)
-│   ├── InteractiveCardWrapper.jsx  # Physics engine
-│   ├── InteractiveCardWrapper.css
-│   └── HolographicOverlay.jsx     # SVG holographic effect
-├── hooks/
-│   └── useSpring.js          # Spring physics
-├── ranks/
-│   ├── BlessedRank.jsx       # Final "Blessed" rank (red theme, butterflies)
-│   └── drafts/               # WIP designs (auto-discovered by Studio)
-│       ├── BlessedDraftInteractive.jsx   # PoC: mouse-driven shimmer
-│       └── BlessedDraftHolographic.jsx   # PoC: CSS-animated shimmer
+│   ├── BaseCard.jsx                 # The Layout Framework & Layer Compositor
+│   └── InteractiveCardWrapper.jsx   # Physics engine & DOM Wrapper
+├── configs/
+│   └── rankConfigs.js        # The official "Profiles" (JSON recipes building Ranks)
+├── registry/                 
+│   └── index.js              # Exports all layer functions for easy importing
+├── layers/                   # THE PUZZLE PIECES
+│   ├── palettes/             # Color constants files
+│   ├── backgrounds/          # SVG Layer 1 components (RadialGlow.jsx)
+│   ├── motifs/               # SVG Layer 2 components (Butterflies.jsx)
+│   ├── textures/             # SVG Layer 3 components (FineNoise.jsx)
+│   └── holo/                 # SVG Layer 4 components (RainbowFoil.jsx)
 └── utils/
-    ├── exportImage.js        # SVG → PNG
-    └── exportVideo.js        # SVG frames → MP4 (ffmpeg.wasm)
+    ├── exportImage.js        # SVG → Canvas → PNG
+    └── exportVideo.js        # SVG frames → Canvas → MP4 (ffmpeg.wasm)
 ```
 
 ---
 
 ## How to Create a New Rank Design
 
-1. Create `src/ranks/drafts/MyNewDraft.jsx` (copy an existing draft as template)
-2. Define `themeColors` + the three render props (`renderBackground`, `renderOverlay`, `renderMotif`)
-3. It auto-appears in Studio via `import.meta.glob` — no registration needed
-4. When finalized, move to `src/ranks/` and wire into `App.jsx`
+Because of the Composition Architecture, you rarely need to write React components to make a new rank.
+
+### Method 1: The Studio Sandbox (Visual)
+1. Run `npm run dev` and open the **Motif Studio ✨**.
+2. Select your desired Palette, Background, Motif, Texture, and Holographic style from the dynamic dropdowns.
+3. Preview the interactive results immediately.
+4. Click **📋 Copy Config JSON**.
+5. Open `src/configs/rankConfigs.js` and paste your new object into the exports list. It is now a permanent rank profile.
+
+### Method 2: Creating New Layers (Code)
+If the existing puzzle pieces aren't enough, you build a new layer:
+1. Create a file in `src/layers/[type]/MyNewLayer.jsx`.
+2. Write a pure SVG renderer function (e.g., `export const renderMyNewLayer = (bounds, colors, uid, etc) => (<g>...</g>)`).
+3. **Crucial:** Export it in `src/registry/index.js`.
+4. The Sandbox Studio will auto-discover it via Vite `import.meta.glob`. You can now select it in the dropdowns!
+
+---
 
 ## SVG Editing Rules
 
-- **All `<defs>` IDs must be scoped** — use `useId()` to generate unique prefixes. Multiple cards render simultaneously in Studio comparison view, and SVG defs share a global namespace.
+- **All `<defs>` IDs must be scoped** — When looping layers, you must pass the `uid` string to ensure gradients and clipping paths don't collide if multiple cards are on the screen.
   ```jsx
-  const uid = useId().replace(/:/g, '');
-  // Then: id={`myGradient${uid}`}
+  // Inside a Motif renderer:
+  <linearGradient id={`myGrad-${uid}`}>...</linearGradient>
+  <path fill={`url(#myGrad-${uid})`} />
   ```
-- **Render props receive `cardBounds`** — an object with `{ width, height, rx, ry }`. Use these for sizing, not hardcoded values.
-- **Background canvas is 1200×800** within a 1600×850 SVG (200px horizontal padding, 25px vertical).
-- **Motifs are clipped** to the inner border rect. Anything drawn outside will be cut.
-- **`mixBlendMode`** is your friend for overlays. Use `'screen'` for additive light effects, `'overlay'` for texture.
-- **Holographic effects** go in `renderOverlay` via `<HolographicOverlay>`. Pass `isShiny` + `lightX`/`lightY` from parent.
+- **Layer render props receive bounds** — Most functions receive `layout` or `bounds` (an object with `{ width, height, rx, ry, cx, cy }`). Use these for sizing gradients. Do not hardcode dimensions.
+- **Backgrounds are 1200x800**, Motif & Holo are smaller (clipped to inner bounds).
+- **Holographics receive physics** — Any holographic layer exported must accept `lightX` and `lightY` props (0 to 1 floats) bounding the mouse position. Transform your gradient stops based on these inputs.
 
-## How to Add Interactive Effects to a New Rank
+---
+
+## Interactive Physics Flow
 
 ```jsx
-// In App.jsx or wherever the card is used:
+// 1. The Wrapper tracks the mouse/touch across the DOM element bounding box
 <InteractiveCardWrapper>
+  {/* 2. It passes normalized 0-1 physics coordinates down to the BaseCard */}
   {({ lightX, lightY }) => (
-    <MyNewRank isShiny={true} lightX={lightX} lightY={lightY} />
+    
+    {/* 3. BaseCard loops through the config JSON... */}
+    <BaseCard config={MyRankConfig} isShiny={true} lightX={lightX} lightY={lightY}>
+      
+      {/* 4. If isShiny is true, it passes the physics to the Holographic layer! */}
+      {config.layers.holo(bounds, colors, uid, lightX, lightY)}
+      
+    </BaseCard>
   )}
 </InteractiveCardWrapper>
-
-// Inside MyNewRank's renderOverlay:
-{isShiny && <HolographicOverlay lightX={lightX} lightY={lightY} cardBounds={cardBounds} />}
 ```
 
 ## Running

@@ -281,6 +281,25 @@ body {
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
 }
 
+/* Generator Mode Selector Styles */
+.generator-mode-selector {
+  background-color: var(--bg-color);
+  padding: 1rem;
+  border-radius: var(--border-radius);
+  border: 1px solid #e2e8f0;
+}
+
+.generator-mode-selector label {
+  color: var(--text-dark);
+  font-size: 0.9rem;
+}
+
+.generator-mode-selector input[type="radio"] {
+  accent-color: var(--primary-color);
+  width: 14px;
+  height: 14px;
+}
+
 .card-panel {
   flex: 1;
   display: flex;
