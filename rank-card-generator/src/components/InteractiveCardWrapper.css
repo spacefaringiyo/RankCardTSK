@@ -1,0 +1,23 @@
+/* ========================================
+   InteractiveCardWrapper — Stage & Card
+   ======================================== */
+
+.interactive-wrapper-stage {
+    /* Perspective on the PARENT so the vanishing point is fixed to the stage center */
+    perspective: 1200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 400px;
+    position: relative;
+}
+
+.interactive-wrapper-card {
+    border-radius: 12px;
+    overflow: hidden;
+    will-change: transform;
+    transform-style: preserve-3d;
+    user-select: none;
+    -webkit-user-select: none;
+}

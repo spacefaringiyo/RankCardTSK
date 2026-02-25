@@ -1,0 +1,29 @@
+### 1. The "Origami Wings" (Geometric Butterfly Nod)
+> "Generate an abstract SVG background pattern using sharp, overlapping geometric polygons (triangles and rhombuses) arranged symmetrically to vaguely suggest the folded, angular silhouette of origami wings. Use a monochromatic color palette of deep crimson base with soft pastel red and dark burgundy geometric shards. Apply subtle `<linearGradient>` to the polygons to give them a 3D folded-paper effect. Do not include any text."
+
+### 2. Ascending Prisms & Diamonds
+> "Design a geometric SVG background featuring a dynamic composition of floating diamonds and vertical parallelograms ascending from the bottom of the canvas, representing 'blessing' or 'ascension'. Set the background to a solid dark red. Render the floating shapes using varying `<opacity>` levels of light crimson, soft pink, and warm white to create a glowing depth effect."
+
+### 3. Sacred Geometry / Minimalist Halos
+> "Create an abstract geometric SVG background using interlocking circles and arcs, reminiscent of minimalist sacred geometry or celestial halos. Set the canvas to a rich, muted red. Use thin, semi-transparent `<circle>` and `<path>` outlines in lighter red, rose, and subtle gold. Focus on perfect, elegant symmetry originating from the center of the canvas."
+
+### 4. Ethereal Light Shafts
+> "Generate a geometric SVG background using a series of sweeping, interlocking angular rays and intersecting polygons that mimic shafts of divine light breaking through. Use a deep red base and overlay translucent, sharply angled shapes in bright coral and cherry red to create an illuminated, abstract sunburst effect. Use distinct geometric borders rather than blurry gradients."
+
+### 5. Abstract Sweeping Curves (Fluid Energy)
+> "Create a smooth, abstract SVG background using symmetrical, sweeping bezier curves (`<path>` elements) that subtly hint at the gentle motion of butterfly wings, without drawing actual wings. Use overlapping, translucent geometric swooshes in shades of rose, ruby, and dark maroon to create an elegant, fluid energy across the background."
+
+### 6. Crimson Stained Glass Tessellation
+> "Design an abstract SVG background using a Delaunay-style triangular mesh or stained-glass tessellation pattern. Keep the color palette strictly to varying shades of deep red, burgundy, and soft pink. Give each `<polygon>` a slight inner gradient to make the geometric pattern look like softly lit glass panels. Ensure the mesh covers the entire background."
+
+### 7. Digital Constellation / Neural Grid
+> "Create a high-tech geometric SVG background combining fine, sharp intersecting lines and tiny geometric nodes (circles and diamonds) resembling a constellation or an aim-trainer's precision grid. Utilize a deep blood-red canvas. The connecting lines and nodes should use glowing white and soft red at various `<opacity>` levels to create a sense of deep, calculated space."
+
+### 8. Zenith Chevrons
+> "Generate a highly energetic, geometric SVG background using stacked, upward-pointing chevrons and sharp arrow-like angles to symbolize peak performance and being 'blessed' with high skill. Use a bold red background, with the chevrons styled via alternating flat reds, dark burgundies, and bright crimson highlights using basic `<polygon>` elements."
+
+### 9. Crystalline / Geode Shards
+> "Design an abstract SVG background composed of clustered, asymmetric crystal-like geometric shards bursting subtly from the corners inward. The color scheme should revolve around rich reds with subtle hints of warm magenta. Utilize `<polygon>` elements with `<linearGradient>` shading to simulate the sharp, glowing facets of a ruby or crystal."
+
+### 10. Abstract Celestial Bokeh
+> "Create a geometric SVG background relying purely on perfectly round, overlapping circles of drastically different scale to create a digital 'bokeh' effect. Set the background to a dark crimson. Use highly transparent `<circle>` elements in shades of bright red, pale pink, and pure white. Intersect the circles with two or three very thin, sharp diagonal lines to break up the roundness."
