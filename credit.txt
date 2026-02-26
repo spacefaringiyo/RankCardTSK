@@ -1,3 +1,5 @@
 iyo
 Gemini
 Claude
+
+Video export powered by FFmpeg. FFmpeg is a trademark of Fabrice Bellard, originator of the FFmpeg project. Licensed under GPLv2.
