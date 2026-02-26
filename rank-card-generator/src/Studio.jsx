@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './Studio.css';
 import BaseCard from './components/BaseCard';
 import InteractiveCardWrapper from './components/InteractiveCardWrapper';
+import { StandardLayout } from './registry';
 
 // 1. Auto-discover all layers via Vite's import.meta.glob
 const palettesModules = import.meta.glob('./layers/palettes/*.js', { eager: true });
@@ -9,6 +10,7 @@ const backgroundsModules = import.meta.glob('./layers/backgrounds/*.jsx', { eage
 const motifsModules = import.meta.glob('./layers/motifs/*.jsx', { eager: true });
 const texturesModules = import.meta.glob('./layers/textures/*.jsx', { eager: true });
 const holoModules = import.meta.glob('./layers/holo/*.jsx', { eager: true });
+const layoutsModules = import.meta.glob('./layers/layouts/*.jsx', { eager: true });
 
 // Convert filename to display name
 function toDisplayName(path) {
@@ -42,7 +44,8 @@ const REGISTRIES = {
     backgrounds: buildRegistry(backgroundsModules),
     motifs: buildRegistry(motifsModules),
     textures: buildRegistry(texturesModules),
-    holo: buildRegistry(holoModules)
+    holo: buildRegistry(holoModules),
+    layouts: buildRegistry(layoutsModules)
 };
 
 // Insert a "None" option into render registries (not palettes)
@@ -52,6 +55,7 @@ const safeRegistries = {
     motifs: { "None": null, ...REGISTRIES.motifs },
     textures: { "None": null, ...REGISTRIES.textures },
     holo: { "None": null, ...REGISTRIES.holo },
+    layouts: REGISTRIES.layouts,
 }
 
 const DEFAULT_SELECTIONS = {
@@ -60,6 +64,7 @@ const DEFAULT_SELECTIONS = {
     motif: Object.keys(safeRegistries.motifs)[0] || 'None',
     texture: Object.keys(safeRegistries.textures)[0] || 'None',
     holo: Object.keys(safeRegistries.holo)[0] || 'None',
+    layout: Object.keys(safeRegistries.layouts)[0] || '',
 };
 
 export default function Studio({ onExit }) {
@@ -105,6 +110,7 @@ export default function Studio({ onExit }) {
     id: 'draft-${Date.now()}',
     displayName: '${sel.palette} Draft',
     themeColors: ${sel.palette ? `${sel.palette.replace(' ', '')}Palette` : '{}'},
+    layout: ${sel.layout ? sel.layout.replace(' ', '') : 'StandardLayout'},
     layers: {
         background: render${sel.background.replace(' ', '')},
         motif: render${sel.motif.replace(' ', '')},
@@ -178,6 +184,7 @@ export default function Studio({ onExit }) {
                         const sandboxConfig = {
                             displayName: sel.palette || 'Rank',
                             themeColors: safeRegistries.palettes[sel.palette] || {},
+                            layout: safeRegistries.layouts[sel.layout] || StandardLayout,
                             layers: {
                                 background: safeRegistries.backgrounds[sel.background],
                                 motif: safeRegistries.motifs[sel.motif],
@@ -223,6 +230,12 @@ export default function Studio({ onExit }) {
                                             <span className="dropdown-label">Holographic</span>
                                             <select value={sel.holo} onChange={(e) => updateSlotSelection(slot.id, 'holo', e.target.value)}>
                                                 {Object.keys(safeRegistries.holo).map(k => <option key={k} value={k}>{k}</option>)}
+                                            </select>
+                                        </div>
+                                        <div className="sandbox-dropdown">
+                                            <span className="dropdown-label">Layout</span>
+                                            <select value={sel.layout} onChange={(e) => updateSlotSelection(slot.id, 'layout', e.target.value)}>
+                                                {Object.keys(safeRegistries.layouts).map(k => <option key={k} value={k}>{k}</option>)}
                                             </select>
                                         </div>
                                     </div>

@@ -1,6 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import './App.css'
-import BlessedRank from './ranks/BlessedRank' // We will keep this for backwards compatibility for now, but we won't use it here.
 import BaseCard from './components/BaseCard'
 import InteractiveCardWrapper from './components/InteractiveCardWrapper'
 import Studio from './Studio'
@@ -10,6 +9,7 @@ import { exportSvgToMp4 } from './utils/exportVideo'
 // 1. Auto-discover all Rank Configs
 const rankConfigModules = import.meta.glob('./configs/rankConfigs.js', { eager: true });
 const RANK_CONFIGS = {};
+import { StandardLayout } from './registry' // Import standard layout fallback
 for (const [path, mod] of Object.entries(rankConfigModules)) {
   // We expect rankConfigs.js to export named configs like BlessedRankConfig
   for (const [exportName, configObj] of Object.entries(mod)) {
@@ -25,6 +25,7 @@ const backgroundsModules = import.meta.glob('./layers/backgrounds/*.jsx', { eage
 const motifsModules = import.meta.glob('./layers/motifs/*.jsx', { eager: true });
 const texturesModules = import.meta.glob('./layers/textures/*.jsx', { eager: true });
 const holoModules = import.meta.glob('./layers/holo/*.jsx', { eager: true });
+const layoutsModules = import.meta.glob('./layers/layouts/*.jsx', { eager: true });
 
 function toDisplayName(path) {
   const filename = path.split('/').pop().replace(/\.(jsx|js)$/, '');
@@ -47,6 +48,7 @@ const safeRegistries = {
   motifs: { "None": null, ...buildRegistry(motifsModules) },
   textures: { "None": null, ...buildRegistry(texturesModules) },
   holo: { "None": null, ...buildRegistry(holoModules) },
+  layouts: buildRegistry(layoutsModules),
 }
 
 const DEFAULT_SANDBOX = {
@@ -55,6 +57,7 @@ const DEFAULT_SANDBOX = {
   motif: Object.keys(safeRegistries.motifs)[0] || 'None',
   texture: Object.keys(safeRegistries.textures)[0] || 'None',
   holo: Object.keys(safeRegistries.holo)[0] || 'None',
+  layout: Object.keys(safeRegistries.layouts)[0] || '',
 };
 
 
@@ -153,6 +156,7 @@ function App() {
       resolvedConfig = {
         displayName: sandboxSelections.palette || 'Rank',
         themeColors: safeRegistries.palettes[sandboxSelections.palette] || {},
+        layout: safeRegistries.layouts[sandboxSelections.layout] || StandardLayout,
         layers: {
           background: safeRegistries.backgrounds[sandboxSelections.background],
           motif: safeRegistries.motifs[sandboxSelections.motif],
@@ -393,6 +397,12 @@ function App() {
                       {Object.keys(safeRegistries.holo).map(k => <option key={k} value={k}>{k}</option>)}
                     </select>
                   </div>
+                  <div className="sandbox-dropdown">
+                    <span className="dropdown-label">Layout</span>
+                    <select value={sandboxSelections.layout} onChange={(e) => setSandboxSelections({ ...sandboxSelections, layout: e.target.value })}>
+                      {Object.keys(safeRegistries.layouts).map(k => <option key={k} value={k}>{k}</option>)}
+                    </select>
+                  </div>
                 </div>
               )}
             </div>
@@ -440,7 +450,7 @@ function App() {
                     <h3>Static Card</h3>
                     <div className="card-scale-wrapper">
                       <BaseCard
-                        config={card.config || BlessedRankConfig}
+                        config={card.config || Object.values(RANK_CONFIGS)[0]}
                         playerName={card.playerName}
                         memberNumber={card.memberNumber}
                         showMemberNumber={card.showMemberNumber}

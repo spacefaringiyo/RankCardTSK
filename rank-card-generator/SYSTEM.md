@@ -28,7 +28,7 @@ App.jsx                          ← Main page: Member Form + Generated Cards
 
 ### The 6-Layer Composition Architecture
 
-Card visual design is completely decoupled from the React components. A "Rank" is just a pure JSON data object (`config`) that tells `<BaseCard>` which layers to pull from the `src/registry/`.
+Card visual design is completely decoupled from the React components. A "Rank" is just a pure JSON data object (`config`) that tells `<BaseCard>` which layers to pull from the `src/registry/`. `BaseCard` itself is a thin compositor — it handles the SVG canvas, clipping, and layer ordering, but delegates *all* structural rendering (borders, text) to the Layout layer.
 
 Every card `config` is composed of 6 layers:
 
@@ -37,7 +37,7 @@ Every card `config` is composed of 6 layers:
 3. **`texture`** — SVG Noise or grain filters applied via `mixBlendMode` (e.g., `FineNoise`).
 4. **`motif`** — Vector decorations (e.g., `Butterflies`, geometric shapes). These are *always* clipped to the inner border bounds.
 5. **`holo`** — Dynamic shimmer shaders linked to mouse physics via `lightX`/`lightY` (e.g., `RainbowFoil`). Only renders when `BaseCard` receives `isShiny={true}`.
-6. **`BaseCard`** (Layout) — The foundational framework. Handles the actual scaling (1600x850), border strokes, typography, clipping masks, and mapping the config pieces into the final SVG.
+6. **`layout`** — A Render Function that returns the structural SVG elements (borders, text labels, logo). Each layout file owns its own coordinate dictionary *and* its own `renderForeground()` function, so different layouts can add, remove, or rearrange structural elements freely. `BaseCard` delegates layers 5 & 6 entirely to `layout.renderForeground()`.
 
 ---
 
@@ -48,7 +48,7 @@ src/
 ├── App.jsx                  # Main page (form, export pipelines, mode selector)
 ├── Studio.jsx               # Motif Sandbox Studio (dynamic visual previewer)
 ├── components/
-│   ├── BaseCard.jsx                 # The Layout Framework & Layer Compositor
+│   ├── BaseCard.jsx                 # Thin Layer Compositor (delegates structure to Layout)
 │   └── InteractiveCardWrapper.jsx   # Physics engine & DOM Wrapper
 ├── configs/
 │   └── rankConfigs.js        # The official "Profiles" (JSON recipes building Ranks)
@@ -59,7 +59,8 @@ src/
 │   ├── backgrounds/          # SVG Layer 1 components (RadialGlow.jsx)
 │   ├── motifs/               # SVG Layer 2 components (Butterflies.jsx)
 │   ├── textures/             # SVG Layer 3 components (FineNoise.jsx)
-│   └── holo/                 # SVG Layer 4 components (RainbowFoil.jsx)
+│   ├── holo/                 # SVG Layer 4 components (RainbowFoil.jsx)
+│   └── layouts/              # SVG Layers 5 & 6 render functions (StandardLayout.jsx)
 └── utils/
     ├── exportImage.js        # SVG → Canvas → PNG
     └── exportVideo.js        # SVG frames → Canvas → MP4 (ffmpeg.wasm)
@@ -73,17 +74,39 @@ Because of the Composition Architecture, you rarely need to write React componen
 
 ### Method 1: The Studio Sandbox (Visual)
 1. Run `npm run dev` and open the **Motif Studio ✨**.
-2. Select your desired Palette, Background, Motif, Texture, and Holographic style from the dynamic dropdowns.
+2. Select your desired Palette, Background, Motif, Texture, Holographic, and **Layout** from the dynamic dropdowns.
 3. Preview the interactive results immediately.
 4. Click **📋 Copy Config JSON**.
 5. Open `src/configs/rankConfigs.js` and paste your new object into the exports list. It is now a permanent rank profile.
 
-### Method 2: Creating New Layers (Code)
-If the existing puzzle pieces aren't enough, you build a new layer:
+### Method 2: Creating New Art Layers (Code)
+If the existing visual puzzle pieces aren't enough, you build a new layer:
 1. Create a file in `src/layers/[type]/MyNewLayer.jsx`.
 2. Write a pure SVG renderer function (e.g., `export const renderMyNewLayer = (bounds, colors, uid, etc) => (<g>...</g>)`).
 3. **Crucial:** Export it in `src/registry/index.js`.
 4. The Sandbox Studio will auto-discover it via Vite `import.meta.glob`. You can now select it in the dropdowns!
+
+### Method 3: Creating a New Layout (Structural)
+Layouts control borders, text positions, and structural elements. To create a new one:
+1. Create `src/layers/layouts/MyLayout.jsx`.
+2. Define a `layoutProps` dictionary with `canvas`, `paddingOffset`, `card`, `innerBorder`, `outerBorder`, and text position objects.
+3. Export an object with:
+   - `props` — the coordinate dictionary (used by `BaseCard` for canvas sizing, clipping, and layer bounds).
+   - `renderForeground(colors, config, playerName, formattedMemberNumber, displayDate, showMemberNumber, showDate)` — a function returning the structural SVG elements (borders, text, logo, or any custom decorative elements unique to this layout).
+4. Export it in `src/registry/index.js`. It will auto-appear in the Layout dropdown.
+
+```jsx
+// Example: A minimal layout that omits the date and member number entirely
+export const MinimalLayout = {
+    props: { canvas: {...}, card: {...}, ... },
+    renderForeground: (colors, config, playerName) => (
+        <>
+            <text ...>{config?.displayName?.toUpperCase()}</text>
+            <text ...>{playerName}</text>
+        </>
+    )
+};
+```
 
 ---
 
@@ -109,13 +132,16 @@ If the existing puzzle pieces aren't enough, you build a new layer:
   {/* 2. It passes normalized 0-1 physics coordinates down to the BaseCard */}
   {({ lightX, lightY }) => (
     
-    {/* 3. BaseCard loops through the config JSON... */}
-    <BaseCard config={MyRankConfig} isShiny={true} lightX={lightX} lightY={lightY}>
-      
-      {/* 4. If isShiny is true, it passes the physics to the Holographic layer! */}
-      {config.layers.holo(bounds, colors, uid, lightX, lightY)}
-      
-    </BaseCard>
+    {/* 3. BaseCard composites all layers using the config JSON */}
+    <BaseCard config={MyRankConfig} isShiny={true} lightX={lightX} lightY={lightY} />
+
+    {/* Internally, BaseCard does:
+        Layer 1: config.layers.background(layoutProps.card, uid, colors)
+        Layer 2: config.layers.texture(layoutProps.card, uid, colors, fx)
+        Layer 3: config.layers.holo(layoutProps.card, uid, lightX, lightY, fx)  // only if isShiny
+        Layer 4: config.layers.motif(layoutProps.card, uid, colors)             // clipped to inner border
+        Layer 5+6: config.layout.renderForeground(colors, config, playerName, ...) 
+    */}
   )}
 </InteractiveCardWrapper>
 ```

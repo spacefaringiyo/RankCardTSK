@@ -4,13 +4,15 @@ import {
     renderRadialGlow,
     renderButterflies,
     renderFineNoise,
-    renderRainbowFoil
+    renderRainbowFoil,
+    StandardLayout
 } from '../registry';
 
 export const BlessedRankConfig = {
     id: 'blessed',
     displayName: 'Blessed',
     themeColors: BlessedPalette,
+    layout: StandardLayout,
     // The recipe for blending layers together
     layers: {
         background: renderRadialGlow,
@@ -30,6 +32,7 @@ export const CursedRankConfig = {
     id: 'cursed',
     displayName: 'Cursed',
     themeColors: CursedPalette,
+    layout: StandardLayout,
     // The exact same rendering layers, totally different vibe due to palette
     layers: {
         background: renderRadialGlow,

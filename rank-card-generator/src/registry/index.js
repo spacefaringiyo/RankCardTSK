@@ -1,3 +1,6 @@
+// --- Layouts ---
+export { StandardLayout } from '../layers/layouts/StandardLayout.jsx';
+
 // --- Palettes ---
 export { BlessedPalette } from '../layers/palettes/BlessedPalette';
 export { CursedPalette } from '../layers/palettes/CursedPalette';
