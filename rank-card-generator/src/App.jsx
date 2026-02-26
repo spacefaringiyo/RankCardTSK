@@ -153,9 +153,10 @@ function App() {
       resolvedConfig = RANK_CONFIGS[selectedProfileId] || Object.values(RANK_CONFIGS)[0];
     } else {
       // Build ephemeral sandbox config
+      const selectedPalette = safeRegistries.palettes[sandboxSelections.palette] || {};
       resolvedConfig = {
-        displayName: sandboxSelections.palette || 'Rank',
-        themeColors: safeRegistries.palettes[sandboxSelections.palette] || {},
+        displayName: selectedPalette.name || sandboxSelections.palette || 'Rank',
+        themeColors: selectedPalette,
         layout: safeRegistries.layouts[sandboxSelections.layout] || StandardLayout,
         layers: {
           background: safeRegistries.backgrounds[sandboxSelections.background],

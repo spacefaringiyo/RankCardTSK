@@ -150,6 +150,7 @@ export const MinimalLayout = {
 
 ```bash
 npm install          # First time
+cd rank-card-generator
 npm run dev          # Dev server (localhost:5173)
 npm run build        # Production build
 ```

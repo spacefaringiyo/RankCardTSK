@@ -1,10 +1,8 @@
 import React from 'react';
 
 export const renderRadialGlow = (cardBounds, uid, themeColors) => {
-    // If no specific background canvas color or gradient stops, use fallbacks
-    const bgColor = themeColors?.backgroundCanvas || '#000000';
-    const centerColor = themeColors?.backgroundGlowCenter || '#c54545';
-    const edgeColor = themeColors?.backgroundGlowEdge || '#9a2a2a';
+    const centerColor = themeColors?.backgroundGlowCenter || 'transparent';
+    const edgeColor = themeColors?.backgroundGlowEdge || 'transparent';
 
     return (
         <React.Fragment>

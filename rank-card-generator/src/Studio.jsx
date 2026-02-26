@@ -181,9 +181,10 @@ export default function Studio({ onExit }) {
                         const sel = slot.selections;
 
                         // Construct the ephemeral sandbox config
+                        const selectedPalette = safeRegistries.palettes[sel.palette] || {};
                         const sandboxConfig = {
-                            displayName: sel.palette || 'Rank',
-                            themeColors: safeRegistries.palettes[sel.palette] || {},
+                            displayName: selectedPalette.name || sel.palette || 'Rank',
+                            themeColors: selectedPalette,
                             layout: safeRegistries.layouts[sel.layout] || StandardLayout,
                             layers: {
                                 background: safeRegistries.backgrounds[sel.background],

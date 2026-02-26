@@ -1,6 +1,6 @@
 export const BlessedPalette = {
     id: 'blessed-crimson',
-    name: 'Blessed Crimson',
+    name: 'BLESSED',
     backgroundCanvas: "#000000",
     backgroundGlowCenter: "#c54545",
     backgroundGlowEdge: "#9a2a2a",

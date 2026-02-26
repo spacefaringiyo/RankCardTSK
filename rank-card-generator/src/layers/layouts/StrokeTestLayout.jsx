@@ -5,16 +5,16 @@ const layoutProps = {
     canvas: { width: 1600, height: 850, viewBox: "0 0 1600 850" },
     paddingOffset: { x: 200, y: 25 },
     card: { width: 1200, height: 800, rx: 40, ry: 40 },
-    innerBorder: { x: 50, y: 50, width: 1100, height: 700, rx: 15, ry: 15, strokeWidth: 3 },
-    outerBorder: { x: 40, y: 40, width: 1120, height: 720, rx: 20, ry: 20, strokeWidth: 8 },
-    textTitle: { x: 600, y: 380, fontSize: 140, letterSpacing: 10 },
-    textPlayerName: { x: 600, y: 540, fontSize: 64, letterSpacing: 4 },
-    textMemberNum: { x: 130, y: 720, fontSize: 32, letterSpacing: 3 },
+    innerBorder: { x: 50, y: 50, width: 1100, height: 700, rx: 15, ry: 15, strokeWidth: 0 },
+    outerBorder: { x: 40, y: 40, width: 1120, height: 720, rx: 20, ry: 20, strokeWidth: 16 },
+    textTitle: { x: 600, y: 380, fontSize: 200, letterSpacing: 10 },
+    textPlayerName: { x: 600, y: 560, fontSize: 64, letterSpacing: 4 },
+    textMemberNum: { x: 80, y: 720, fontSize: 32, letterSpacing: 3 },
     textDate: { x: 1120, y: 720, fontSize: 32, letterSpacing: 2 },
     textLogo: { x: 1135, y: 98, fontSize: 42, letterSpacing: 1 },
 };
 
-export const StandardLayout = {
+export const LargerRankNameLayout = {
     // We still export the raw data so the LayoutBuilder (future) can read it, 
     // and BaseCard can still use it for padding/canvas scaling.
     props: layoutProps,
@@ -47,7 +47,7 @@ export const StandardLayout = {
                 textAnchor="middle" letterSpacing={layoutProps.textTitle.letterSpacing}
                 dominantBaseline="central"
             >
-                {(colors.name || config?.displayName || 'RANK').replace(' PALETTE', '')}
+                {config?.displayName ? config.displayName.toUpperCase().replace(' PALETTE', '') : 'RANK'}
             </text>
 
             <text
@@ -62,23 +62,15 @@ export const StandardLayout = {
             </text>
 
             {showMemberNumber && (
-                <g transform={`translate(${layoutProps.textMemberNum.x}, ${layoutProps.textMemberNum.y})`}>
-                    {/* Subtle Pill Background */}
-                    <rect
-                        x="-65" y="-25" width="130" height="44" rx="22"
-                        fill="#000000" opacity="0.2"
-                    />
-                    <text
-                        x="0" y="0"
-                        fontFamily="'Helvetica', 'Arial', sans-serif"
-                        fontSize={layoutProps.textMemberNum.fontSize}
-                        fontWeight="normal" fill={colors.accentText}
-                        textAnchor="middle" letterSpacing={layoutProps.textMemberNum.letterSpacing}
-                        dominantBaseline="middle"
-                    >
-                        {formattedMemberNumber}
-                    </text>
-                </g>
+                <text
+                    x={layoutProps.textMemberNum.x} y={layoutProps.textMemberNum.y}
+                    fontFamily="'Helvetica', 'Arial', sans-serif"
+                    fontSize={layoutProps.textMemberNum.fontSize}
+                    fontWeight="normal" fill={colors.accentText}
+                    textAnchor="start" letterSpacing={layoutProps.textMemberNum.letterSpacing} opacity="0.9"
+                >
+                    {formattedMemberNumber}
+                </text>
             )}
 
             {showDate && (
